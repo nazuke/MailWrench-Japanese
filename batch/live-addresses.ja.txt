@@ -1,0 +1,5 @@
+# This file must be encoded as UTF-8 text
+# Comment lines begin with a # character
+email-address@some-domain.com	お名前
+email-address@some-domain.com	お名前
+email-address@some-domain.com	お名前

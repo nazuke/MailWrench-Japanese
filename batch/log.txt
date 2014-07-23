@@ -1,0 +1,40 @@
+Starting...
+Preparing Subject Line...
+Setting Content-Type...
+  SMTP_HOST: "smtp.domain.com"
+  SMTP_USER: "your-email-address@domain.com"
+        BCC: "some-other-email-address@domain.com"
+   LISTPATH: "batch/test-addresses.ja.txt"
+   PATHNAME: "batch/message.ja.txt"
+       FROM: "=?iso-2022-jp?B?VXNlciBhdCBDb21wYW55IE5hbWU=?= <some-user@your-domain.com>"
+   REPLY-TO: "=?iso-2022-jp?B?VXNlciBhdCBDb21wYW55IE5hbWU=?= <some-user@your-domain.com>"
+    SUBJECT: "=?iso-2022-jp?B?VGhpcyBpcyB0aGUgc3ViamVjdCBsaW5lIGVuY29kZWQgaW4gVVRGLTg6IBskQkZ8S1w4bCROJUYlLyU5JUgbKEI=?="
+ ATTACHPATH: ""
+CONTENTTYPE: "text/plain; charset=iso-2022-jp"
+  your-email-address@your-domain.com
+    mailshot_id: "development-mode"
+    Attempt: 1 your-email-address@your-domain.com
+    ERROR: Failed to connect to SMTP Server: your-email-address@your-domain.com
+Already Sent: "your-email-address@your-domain.com"
+Already Sent: "your-email-address@your-domain.com"
+Done.
+Starting...
+Preparing Subject Line...
+Setting Content-Type...
+  SMTP_HOST: "smtp.domain.com"
+  SMTP_USER: "your-email-address@domain.com"
+        BCC: "some-other-email-address@domain.com"
+   LISTPATH: "batch/test-addresses.ja.txt"
+   PATHNAME: "batch/message.ja.txt"
+       FROM: "=?iso-2022-jp?B?VXNlciBhdCBDb21wYW55IE5hbWU=?= <some-user@your-domain.com>"
+   REPLY-TO: "=?iso-2022-jp?B?VXNlciBhdCBDb21wYW55IE5hbWU=?= <some-user@your-domain.com>"
+    SUBJECT: "=?iso-2022-jp?B?VGhpcyBpcyB0aGUgc3ViamVjdCBsaW5lIGVuY29kZWQgaW4gVVRGLTg6IBskQkZ8S1w4bCROJUYlLyU5JUgbKEI=?="
+ ATTACHPATH: ""
+CONTENTTYPE: "text/plain; charset=iso-2022-jp"
+  your-email-address@your-domain.com
+    mailshot_id: "development-mode"
+    Attempt: 1 your-email-address@your-domain.com
+    ERROR: Failed to connect to SMTP Server: your-email-address@your-domain.com
+Already Sent: "your-email-address@your-domain.com"
+Already Sent: "your-email-address@your-domain.com"
+Done.

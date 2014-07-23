@@ -1,0 +1,4 @@
+This is some Japanese text encoded in UTF-8:
+日本語
+いち、に、さん、休み
+1234567890
