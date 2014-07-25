@@ -1,15 +1,19 @@
 perl MailWrench-Japanese.pl ^
- -a "batch/test-addresses.ja.txt" ^
- -m "batch/message.ja.txt" ^
- -b "some-other-email-address@domain.com" ^
- -u "your-email-address@domain.com" ^
- -s "batch/subject.ja.txt" ^
- -h "smtp.domain.com" ^
- -e "batch/from.ja.txt" ^
- -r "batch/from.ja.txt" ^
- -d "mail.domain.com" ^
- -l "batch/log.txt" ^
- -t "development-mode" ^
- -i "https://your-domain.com/path/to/view/track/service" ^
- -k "https://your-domain.com/path/to/click/track/service" ^
- -q 10
+-a "batch/test-addresses.ja.txt" ^
+-b "some-other-email-address@domain.com" ^
+-c true ^
+-d "mail.domain.com" ^
+-e "batch/from.ja.txt" ^
+-h "smtp.domain.com" ^
+-i "https://your-domain.com/path/to/view/track/service" ^
+-k "https://your-domain.com/path/to/click/track/service" ^
+-l "batch/log.txt" ^
+-m "batch/message.ja.txt" ^
+-n "smtp-username" ^
+-p 465 ^
+-q 10 ^
+-r "batch/from.ja.txt" ^
+-s "batch/subject.ja.txt" ^
+-t "development-mode" ^
+-u "your-email-address@domain.com" ^
+-w "smtp-password"
