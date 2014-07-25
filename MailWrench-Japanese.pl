@@ -3,7 +3,7 @@
 =pod
 
 	AUTHOR: nazuke.hondou@googlemail.com
-	UPDATED: 20140723
+	UPDATED: 20140725
 
 	ABOUT:
 
@@ -37,16 +37,13 @@ use Encode qw( _utf8_on is_utf8 encode decode );
 use MIME::Entity;
 use MIME::Base64;
 use Net::SMTP;
+use Net::SMTP::SSL;
 use HTTP::Date;
 use XML::LibXML;
 
 ##########################################################################################
 
-our $LOGFILE     = 'log.txt';
-our $MAIL_DOMAIN = '';	# Domain of the email user.
-our $SMTP_HOST   = '';	# Address of SMTP Server.
-our $SMTP_USER   = '';	# Email address of user for SMTP Server.
-our $BCC         = '';	# Email address to BCC copies of each email sent to.
+our $LOGFILE = 'log.txt';
 
 ##########################################################################################
 
@@ -65,10 +62,14 @@ my %options = (
 	't' => '',
 	'i' => '',
 	'k' => '',
-	'q' => ''
+	'p' => '',
+	'n' => '',
+	'w' => '',
+	'q' => '',
+	'c' => ''
 );
 
-Getopt::Std::getopt( 'ambusherdfltik', \%options );
+Getopt::Std::getopt( 'ambusherdfltikpqnwc', \%options );
 
 my $subject       = load_file( $options{'s'} );
 my $from          = load_file( $options{'e'} );
@@ -83,10 +84,30 @@ my %duplicates    = ();
 my $sleep_count   = 0;
 my $retries       = 20;
 
+my $MAIL_DOMAIN   = '';	# Domain of the email user.
+my $SMTP_HOST     = '';	# Address of SMTP Server.
+my $SMTP_PORT     = '';	# Port to connect to on SMTP Server.
+my $SMTP_USER     = '';	# Email address of user for SMTP Server.
+my $SMTP_ENCRYPT  = '';	# true/false to use SSL.
+my $SMTP_USERNAME = '';	# SMTP Username.
+my $SMTP_PASSWORD = '';	# SMTP Password.
+my $BCC           = '';	# Email address to BCC copies of each email sent to.
+
 if( $options{'d'} ) {
 	$MAIL_DOMAIN = $options{'d'};
 } else {
 	logger( qq(ERROR: No Mail Domain Supplied!) );
+	exit(-1);
+}
+
+if( $options{'c'} ) {
+	if( lc( $options{'c'} ) eq 'true' ) {
+		$SMTP_ENCRYPT = 1;
+	} else {
+		$SMTP_ENCRYPT = 0;
+	}
+} else {
+	$SMTP_ENCRYPT = 0;
 }
 
 if( $options{'l'} ) {
@@ -97,12 +118,43 @@ if( $options{'h'} ) {
 	$SMTP_HOST = $options{'h'};
 } else {
 	logger( qq(ERROR: No SMTP Hostname Supplied!) );
+	exit(-1);
+}
+
+if( $options{'p'} ) {
+	$SMTP_PORT = $options{'p'};
+} else {
+	logger( qq(ERROR: No SMTP Port Supplied!) );
+	exit(-1);
 }
 
 if( $options{'u'} ) {
 	$SMTP_USER = $options{'u'};
 } else {
-	logger( qq(ERROR: No SMTP Username Supplied!) );
+	logger( qq(ERROR: No SMTP User Email Address Supplied!) );
+	exit(-1);
+}
+
+if( $options{'n'} ) {
+	$SMTP_USERNAME = $options{'n'};
+} else {
+	if( $ENV{'MAILWRENCH_SMTP_USERNAME'} ) {
+		$SMTP_USERNAME = $ENV{'MAILWRENCH_SMTP_USERNAME'};
+	} else {
+		logger( qq(ERROR: No SMTP Username Supplied!) );
+		exit(-1);
+	}
+}
+
+if( $options{'w'} ) {
+	$SMTP_PASSWORD = $options{'w'};
+} else {
+	if( $ENV{'MAILWRENCH_SMTP_PASSWORD'} ) {
+		$SMTP_PASSWORD = $ENV{'MAILWRENCH_SMTP_PASSWORD'};
+	} else {
+		logger( qq(ERROR: No SMTP Password Supplied!) );
+		exit(-1);
+	}
 }
 
 if( $options{'b'} ) {
@@ -149,16 +201,19 @@ SWITCH: for( $options{'m'} ) {
 	die( "oops" );
 }
 
-logger( qq(  SMTP_HOST: "$SMTP_HOST") );
-logger( qq(  SMTP_USER: "$SMTP_USER") );
-logger( qq(        BCC: "$BCC") );
-logger( qq(   LISTPATH: "$options{'a'}") );
-logger( qq(   PATHNAME: "$options{'m'}") );
-logger( qq(       FROM: "$from") );
-logger( qq(   REPLY-TO: "$reply") );
-logger( qq(    SUBJECT: "$subject_enc") );
-logger( qq( ATTACHPATH: "$options{'f'}") );
-logger( qq(CONTENTTYPE: "$contenttype") );
+logger( qq(      SMTP_HOST: "$SMTP_HOST") );
+logger( qq(      SMTP_PORT: "$SMTP_PORT") );
+logger( qq(      SMTP_USER: "$SMTP_USER") );
+logger( qq(  SMTP_USERNAME: "$SMTP_USERNAME") );
+logger( qq(  SMTP_PASSWORD: "********") );
+logger( qq(            BCC: "$BCC") );
+logger( qq(       LISTPATH: "$options{'a'}") );
+logger( qq(       PATHNAME: "$options{'m'}") );
+logger( qq(           FROM: "$from") );
+logger( qq(       REPLY-TO: "$reply") );
+logger( qq(        SUBJECT: "$subject_enc") );
+logger( qq(     ATTACHPATH: "$options{'f'}") );
+logger( qq(    CONTENTTYPE: "$contenttype") );
 
 PROCESS: foreach my $line ( split( m/\n/s, $list ) ) {
 
@@ -260,15 +315,19 @@ PROCESS: foreach my $line ( split( m/\n/s, $list ) ) {
 			do {
 				logger( "Attempt: $attempt $email", 2 );
 				my $success = sendmail(
-					smtp_host   => $SMTP_HOST,
-					smtp_user   => $SMTP_USER,
-					from        => $from,
-					reply       => $reply || $from,
-					recipient   => $email,
-					subject     => $subject_enc,
-					contenttype => $contenttype,
-					message     => Encode::encode( 'iso-2022-jp', $message ),
-					attachments => \@attachpath
+					smtp_host     => $SMTP_HOST,
+					smtp_port     => $SMTP_PORT,
+					smtp_user     => $SMTP_USER,
+					smtp_encrypt  => $SMTP_ENCRYPT,
+					smtp_username => $SMTP_USERNAME,
+					smtp_password => $SMTP_PASSWORD,
+					from          => $from,
+					reply         => $reply || $from,
+					recipient     => $email,
+					subject       => $subject_enc,
+					contenttype   => $contenttype,
+					message       => Encode::encode( 'iso-2022-jp', $message ),
+					attachments   => \@attachpath
 				);
 				if( $success ) {
 					$attempt = 0;
@@ -314,24 +373,54 @@ sub load_file {
 ##########################################################################################
 
 sub sendmail {
-	my %args        = @_;
-	my $smtp_host   = $args{smtp_host};
-	my $smtp_user   = $args{smtp_user};
-	my $from        = $args{from};
-	my $reply       = $args{reply} || $from;
-	my $recipient   = $args{recipient};
-	my $subject     = $args{subject};
-	my $contenttype = $args{contenttype};
-	my $message     = $args{message};
-	my $attachments = $args{attachments};
-	my $success     = undef;
-	my $smtp        = Net::SMTP->new(
-		$args{smtp_host},
-		Hello => $MAIL_DOMAIN,
-		Debug => 0
-	);
+	my %args          = @_;
+	my $smtp_domain   = $args{'smtp_domain'};
+	my $smtp_host     = $args{'smtp_host'};
+	my $smtp_port     = $args{'smtp_port'};
+	my $smtp_user     = $args{'smtp_user'};
+
+	my $smtp_encrypt  = $args{'smtp_encrypt'} || 0;
+	my $smtp_username = $args{'smtp_username'} || undef;
+	my $smtp_password = $args{'smtp_password'} || undef;
+
+	my $from          = $args{'from'};
+	my $reply         = $args{'reply'} || $from;
+	my $recipient     = $args{'recipient'};
+	my $subject       = $args{'subject'};
+	my $contenttype   = $args{'contenttype'};
+	my $message       = $args{'message'};
+	my $attachments   = $args{'attachments'};
+	my $success       = undef;
+
+	my $smtp          = undef;
+
+	if( $smtp_encrypt ) {
+		$smtp = Net::SMTP::SSL->new(
+			$smtp_host,
+			Port  => $smtp_port,
+			Hello => $smtp_domain,
+			Debug => 0
+		);
+		if( defined( $smtp ) ) {
+			if( $smtp_username && $smtp_password ) {
+				logger( qq(Authenticating), 3 );
+				$smtp->auth( $smtp_username, $smtp_password );
+			} else {
+				logger( qq(Skipping Authentication), 3 );
+			}
+		}
+	} else {
+		$smtp = Net::SMTP->new(
+			$smtp_host,
+			Hello => $smtp_domain,
+			Debug => 0
+		);
+	}
+
 	if( defined( $smtp ) ) {
+
 		if( $smtp->mail( $from ) ) {
+
 			if( $smtp->to( $recipient ) ) {
 				if( $BCC ) {
 					$smtp->bcc( $BCC );
@@ -349,16 +438,16 @@ sub sendmail {
 				$smtp->datasend( $data );
 				$smtp->dataend();
 				$success = 1;
-				logger( "SENT MAIL: $recipient", 2 );
+				logger( qq(SENT MAIL: "$recipient"), 2 );
 			} else {
-				logger( "ERROR: sendmail 1: $recipient", 2 );
+				logger( qq(ERROR: sendmail 1: "$recipient"), 2 );
 			}
 		} else {
-			logger( "ERROR: sendmail 2: $recipient", 2 );
+			logger( qq(ERROR: sendmail 2: "$recipient"), 2 );
 		}
 		$smtp->quit();
 	} else {
-		logger( "ERROR: Failed to connect to SMTP Server: $recipient", 2 );
+		logger( qq(ERROR: Failed to connect to SMTP Server: "$smtp_host" "$recipient"), 2 );
 	}
 	return( $success );
 }
@@ -367,13 +456,13 @@ sub sendmail {
 
 sub build_multipart {
 	my %args        = @_;
-	my $from        = $args{from};
-	my $reply       = $args{reply} || $from;
-	my $to          = $args{to};
-	my $subject     = $args{subject};
-	my $contenttype = $args{contenttype};
-	my $message     = $args{message};
-	my $attachments = $args{attachments};
+	my $from        = $args{'from'};
+	my $reply       = $args{'reply'} || $from;
+	my $to          = $args{'to'};
+	my $subject     = $args{'subject'};
+	my $contenttype = $args{'contenttype'};
+	my $message     = $args{'message'};
+	my $attachments = $args{'attachments'};
 	my $date        = HTTP::Date::time2str( time() );
 	$date           =~ s/GMT/+0000/;
 	my $mime        = MIME::Entity->build(

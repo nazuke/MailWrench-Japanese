@@ -14,4 +14,8 @@ perl MailWrench-Japanese.pl \
  -t "development-mode" \
  -i "https://your-domain.com/path/to/view/track/service" \
  -k "https://your-domain.com/path/to/click/track/service" \
- -q 10
+ -q 10 \
+ -p 465 \
+ -n "smtp-username" \
+ -w "smtp-password" \
+ -c true
