@@ -54,20 +54,78 @@ The script may be used as-is, or it may be called from some other process.
 
 The currently supported options are:
 
-	-e = path to text file containing email address of sender
-	-r = path to text file containing email address for reply-to
-	-a = path to text file containing email addresses
-	-m = path to file containing message body, text or HTML
-	-s = path to file containing text file containing subject line
-	-f = CSV of paths of files to attach, accepts PDF, VCS, HTML and TXT
-	-l = Path to log file
-	-h = SMTP Server Hostname or IP Address
-	-u = SMTP Server Username, usually your email address
-	-b = Email address to BCC a copy of each email sent to
-	-q = Number of transmission tries before giving up
-	-i = URL of view tracking service, see below for more information
-	-k = URL of click tracking service, see below for more information
+	--from
+	
+		Path to text file containing email address of sender.
 
+	--reply
+	
+		Path to text file containing email address for reply-to.
+
+	--list
+	
+		Path to text file containing email addresses.
+
+	--message
+	
+		Path to file containing message body, in plain text or HTML format.
+
+	--subject
+	
+		Path to text file containing subject line.
+
+	--attachment [may be repeated]
+
+		Path to file to attach; accepts PDF, VCS, HTML, TXT, JPG, GIF and PNG.
+
+	--logfile
+	
+		Path to log file.
+
+	--mail-domain [optional]
+	
+		Some SMTP servers require your domain to be passed, consult your system administrator if this is required. This is often simply the domain part of your email address.
+
+	--smtp-host
+	
+		SMTP server hostname or IP address.
+
+	--smtp-port [optional]
+	
+		SMTP server port number, consult your system administrator for this.
+
+	--encrypt [optional]
+
+		If enabled, then an encrypted SMTP connection will be attempted. Will possibly also require --smtp-username and --smtp-password parameters to be passed.
+
+	--smtp-username [optional]
+
+		SMTP server username, if encryption is enabled.
+
+	--smtp-password [optional]
+
+		SMTP server password, if encryption is enabled.
+
+	--bcc [optional]
+	
+		Email address to BCC a copy of each email sent to.
+
+	--retries
+	
+		Requires an integer. Number of transmission tries before giving up.
+
+	--view-track
+	
+		URL of view tracking service, see below for more information.
+
+	--click-track
+	
+		URL of click tracking service, see below for more information.
+
+	--mailshot-id
+	
+		A meaningful string value that will be incorporated into links in the HTML format version of the message body.
+	
 -----------------------------------------------------------------------------
 
 WINDOWS USAGE
@@ -87,6 +145,44 @@ Linux, UNIX and Mac OS X USAGE:
 2. Edit the files in "batch".
 3. From a command prompt go to the directory containing the "MailWrench-Japanese.sh" file.
 4. Run the "MailWrench-Japanese.sh" file.
+
+-----------------------------------------------------------------------------
+
+MAILSHOT-ID AND THE LEADCODE
+
+For marketing purposes, it is often useful to employ a lead code to match email reponses to a particular marketing campaign.
+
+Use the --mailshot-id parameter to do this. In the HTML format version of your message, you may then add the placeholder __LEADCODE__ to embedded URLs. The mailshot program will then concatenate and Base64-encode the mailshot-id, :: (two colons), and the recipient's email address. Your server software will be responsible for logging and decoding these values. 
+
+-----------------------------------------------------------------------------
+
+VIEW TRACK URL FORMAT
+
+If your message body is in HTML format, then it is possible to use a view-tracking image tag that calls back to your own web server.
+
+In your HTML message file, add an image tag like this:
+
+	<img src="__TRACKER__" />
+
+The mailshot program will process the __TRACKER__ placeholder string with the base URL specified in the --view-track command line parameter, and will append two URI parameters for your web server:
+
+	i = Base64-encoded copy of the mailshot-id string.
+
+	u = Base64-encoded copy of the recipient's email address.
+
+-----------------------------------------------------------------------------
+
+CLICK TRACK URL FORMAT
+
+If your message body is in HTML format, then it is possible to have all anchors in the message converted into click-tracking links that call back to your own web server.
+
+This is enabled by using the --click-track command line parameter, and will append three URI parameters for your web server:
+
+	i = Base64-encoded copy of the mailshot-id string.
+
+	u = Base64-encoded copy of the recipient's email address.
+
+	l = Base64-encoded copy of the HREF value of the anchor clicked.
 
 -----------------------------------------------------------------------------
 

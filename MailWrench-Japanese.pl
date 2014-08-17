@@ -11,20 +11,7 @@
 		This program should work on UNIX/Linux and Windows systems.
 		For Windows, this has been known to work under Strawberry Perl.
 
-	OPTIONS:
-
-		-a = path to text file containing email addresses
-		-m = path to file containing message body, text or HTML
-		-b = Email address to BCC a copy of each email sent to
-		-u = SMTP Server Username, usually your email address
-		-s = path to file containing text file containing subject line
-		-h = SMTP Server Hostname or IP Address
-		-e = email address of sender
-		-r = Return email address
-		-f = CSV of paths of files to attach, accepts PDF, VCS, HTML and TXT
-		-l = Path to log file
-		-t = Mailshot or other unique ID
-		-v = URL of view tracking service
+		See the accompanying README.TXT file for more information.
 
 =cut
 
@@ -60,12 +47,10 @@ sub new {
 	my $self    = {};
 	bless( $self, $package );
 
-
-	$self->{'LOGFILE'}     = 'log.txt';
-
+	$self->{'logfile'}     = 'log.txt';
 	$self->{'duplicates'}  = {};
 	$self->{'sleep_count'} = 0;
-	
+
 	$self->{'SMTP'} = {
 		'MAIL_DOMAIN'   => '', # Domain of the email user.
 		'SMTP_HOST'     => '', # Address of SMTP Server.
@@ -98,27 +83,26 @@ sub new {
 
 	GetOptions(
 
-		'logfile=s'     => \$self->{'LOGFILE'},
+		'logfile=s'       => \$self->{'logfile'},
 
-		'mail-domain=s' => \$self->{'SMTP'}->{'MAIL_DOMAIN'},
-		'smtp-host=s'   => \$self->{'SMTP'}->{'SMTP_HOST'},
-		'smtp-port=i'   => \$self->{'SMTP'}->{'SMTP_PORT'},
-		'smtp-user=s'   => \$self->{'SMTP'}->{'SMTP_USER'},
-		'encrypt'       => \$self->{'SMTP'}->{'SMTP_ENCRYPT'},
-		'username:s'    => \$self->{'SMTP'}->{'SMTP_USERNAME'},
-		'password:s'    => \$self->{'SMTP'}->{'SMTP_PASSWORD'},
-		'retries:i'     => \$self->{'SMTP'}->{'RETRIES'},
+		'mail-domain=s'   => \$self->{'SMTP'}->{'MAIL_DOMAIN'},
+		'smtp-host=s'     => \$self->{'SMTP'}->{'SMTP_HOST'},
+		'smtp-port=i'     => \$self->{'SMTP'}->{'SMTP_PORT'},
+		'encrypt'         => \$self->{'SMTP'}->{'SMTP_ENCRYPT'},
+		'smtp-username:s' => \$self->{'SMTP'}->{'SMTP_USERNAME'},
+		'smtp-password:s' => \$self->{'SMTP'}->{'SMTP_PASSWORD'},
+		'retries:i'       => \$self->{'SMTP'}->{'RETRIES'},
 
-		'subject=s'     => \$self->{'OPTIONS'}->{'subject_'},
-		'from=s'        => \$self->{'OPTIONS'}->{'from_'},
-		'reply:s'       => \$self->{'OPTIONS'}->{'reply_'},
-		'bcc:s'         => \$self->{'OPTIONS'}->{'bcc'},
-		'list=s'        => \$self->{'OPTIONS'}->{'list_'},
-		'message=s'     => \$self->{'OPTIONS'}->{'template_'},
-		'view-track:s'  => \$self->{'OPTIONS'}->{'viewtrack_url'},
-		'click-track:s' => \$self->{'OPTIONS'}->{'cliktrack_url'},
-		'mailshot-id:s' => \$self->{'OPTIONS'}->{'mailshot_id'},
-		'attachment:s'  => $self->{'OPTIONS'}->{'attachments'}
+		'subject=s'       => \$self->{'OPTIONS'}->{'subject_'},
+		'from=s'          => \$self->{'OPTIONS'}->{'from_'},
+		'reply:s'         => \$self->{'OPTIONS'}->{'reply_'},
+		'bcc:s'           => \$self->{'OPTIONS'}->{'bcc'},
+		'list=s'          => \$self->{'OPTIONS'}->{'list_'},
+		'message=s'       => \$self->{'OPTIONS'}->{'template_'},
+		'view-track:s'    => \$self->{'OPTIONS'}->{'viewtrack_url'},
+		'click-track:s'   => \$self->{'OPTIONS'}->{'cliktrack_url'},
+		'mailshot-id:s'   => \$self->{'OPTIONS'}->{'mailshot_id'},
+		'attachment:s'    => $self->{'OPTIONS'}->{'attachments'}
 
 	);
 
@@ -134,10 +118,6 @@ sub new {
 
 	unless( $self->{'SMTP'}->{'SMTP_PORT'} ) {
 		die( qq(ERROR: No SMTP Port Supplied!) );
-	}
-
-	unless( $self->{'SMTP'}->{'SMTP_USER'} ) {
-		die( qq(ERROR: No SMTP User Supplied!) );
 	}
 
 	if( $self->{'SMTP'}->{'SMTP_ENCRYPT'} ) {
@@ -209,7 +189,6 @@ sub run {
 
 	$self->logger( qq(      SMTP_HOST: "$self->{'SMTP'}->{'SMTP_HOST'}") );
 	$self->logger( qq(      SMTP_PORT: "$self->{'SMTP'}->{'SMTP_PORT'}") );
-	$self->logger( qq(      SMTP_USER: "$self->{'SMTP'}->{'SMTP_USER'}") );
 	$self->logger( qq(  SMTP_USERNAME: "$self->{'SMTP'}->{'SMTP_USERNAME'}") );
 	$self->logger( qq(  SMTP_PASSWORD: "********") );
 	$self->logger( qq(           FROM: "$self->{'OPTIONS'}->{'from'}") );
@@ -378,27 +357,6 @@ sub process_list {
 
 ##########################################################################################
 
-sub load_file {
-	my $self     = shift;
-	my $pathname = shift;
-
-	unless( $pathname ) {
-		cluck();
-	}
-
-	my $data     = '';
-	if( open( FILE, "<:encoding(utf-8)", $pathname ) ) {
-		while( my $line = <FILE> ) {
-			$data .= $line;
-		}
-		close( FILE );
-		return( $data );
-	}
-	return( undef );
-}
-
-##########################################################################################
-
 sub sendmail {
 	my $self          = shift;
 	my %args          = @_;
@@ -560,11 +518,30 @@ sub encode_field {
 
 ##########################################################################################
 
+sub load_file {
+	my $self     = shift;
+	my $pathname = shift;
+	unless( $pathname ) {
+		cluck();
+	}
+	my $data     = '';
+	if( open( FILE, "<:encoding(utf-8)", $pathname ) ) {
+		while( my $line = <FILE> ) {
+			$data .= $line;
+		}
+		close( FILE );
+		return( $data );
+	}
+	return( undef );
+}
+
+##########################################################################################
+
 sub logger {
 	my $self    = shift;
 	my $message = shift;
 	my $depth   = shift || 0;
-	open( LOGFILE, ">>" . $self->{'LOGFILE'} );
+	open( LOGFILE, ">>" . $self->{'logfile'} );
 	print( "  " x $depth . $message . "\n" );
 	print( LOGFILE "  " x $depth . $message . "\n" );
 	close( LOGFILE );

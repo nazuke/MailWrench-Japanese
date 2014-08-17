@@ -5,9 +5,8 @@ perl MailWrench-Japanese.pl ^
 --mail-domain "mail.domain.com" ^
 --smtp-host "smtp.domain.com" ^
 --smtp-port 465 ^
---smtp-user "your-email-address@domain.com" ^
---username "smtp-username" ^
---password "smtp-password"
+--smtp-username "smtp-username" ^
+--smtp-password "smtp-password"
 --retries 10 ^
 --encrypt ^
 ^
@@ -17,6 +16,8 @@ perl MailWrench-Japanese.pl ^
 --bcc "some-other-email-address@domain.com" ^
 --list "batch/test-addresses.ja.txt" ^
 --message "batch/message.ja.txt" ^
+--attachment="batch/attachments/torii.jpg" ^
+--attachment="batch/attachments/ema.jpg" ^
 --view-track "https://your-domain.com/path/to/view/track/service" ^
 --click-track "https://your-domain.com/path/to/click/track/service" ^
 --mailshot_id "development-mode" ^
