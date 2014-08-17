@@ -1,9 +1,9 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
 
 =pod
 
 	AUTHOR: nazuke.hondou@googlemail.com
-	UPDATED: 20140725
+	UPDATED: 20140817
 
 	ABOUT:
 
@@ -30,9 +30,12 @@
 
 ##########################################################################################
 
+package MailWrench;
+
 use strict;
 use warnings;
-use Getopt::Std;
+use Carp qw( cluck );
+use Getopt::Long;
 use Encode qw( _utf8_on is_utf8 encode decode );
 use MIME::Entity;
 use MIME::Base64;
@@ -43,322 +46,346 @@ use XML::LibXML;
 
 ##########################################################################################
 
-our $LOGFILE = 'log.txt';
+
+my $wrench = MailWrench->new();
+$wrench->run();
+exit(0);
+
 
 ##########################################################################################
 
-my %options = (
-	'a' => '',
-	'm' => '',
-	'b' => '',
-	'u' => '',
-	's' => '',
-	'h' => '',
-	'e' => '',
-	'r' => '',
-	'd' => '',
-	'f' => '',
-	'l' => '',
-	't' => '',
-	'i' => '',
-	'k' => '',
-	'p' => '',
-	'n' => '',
-	'w' => '',
-	'q' => '',
-	'c' => ''
-);
 
-Getopt::Std::getopt( 'ambusherdfltikpqnwc', \%options );
+sub new {
+	my $package = shift;
+	my $self    = {};
+	bless( $self, $package );
 
-my $subject       = load_file( $options{'s'} );
-my $from          = load_file( $options{'e'} );
-my $reply         = load_file( $options{'r'} ) || $from;
-my $list          = load_file( $options{'a'} );
-my $template      = load_file( $options{'m'} );
-my $viewtrack_url = $options{'i'} || undef;
-my $cliktrack_url = $options{'k'} || undef;
-my $mailshot_id   = $options{'t'} || undef;
-my $contenttype   = 'text/plain';
-my %duplicates    = ();
-my $sleep_count   = 0;
-my $retries       = 20;
 
-my $MAIL_DOMAIN   = '';	# Domain of the email user.
-my $SMTP_HOST     = '';	# Address of SMTP Server.
-my $SMTP_PORT     = '';	# Port to connect to on SMTP Server.
-my $SMTP_USER     = '';	# Email address of user for SMTP Server.
-my $SMTP_ENCRYPT  = '';	# true/false to use SSL.
-my $SMTP_USERNAME = '';	# SMTP Username.
-my $SMTP_PASSWORD = '';	# SMTP Password.
-my $BCC           = '';	# Email address to BCC copies of each email sent to.
+	$self->{'LOGFILE'}     = 'log.txt';
 
-if( $options{'d'} ) {
-	$MAIL_DOMAIN = $options{'d'};
-} else {
-	logger( qq(ERROR: No Mail Domain Supplied!) );
-	exit(-1);
-}
+	$self->{'duplicates'}  = {};
+	$self->{'sleep_count'} = 0;
+	
+	$self->{'SMTP'} = {
+		'MAIL_DOMAIN'   => '', # Domain of the email user.
+		'SMTP_HOST'     => '', # Address of SMTP Server.
+		'SMTP_PORT'     => '', # Port to connect to on SMTP Server.
+		'SMTP_USER'     => '', # Email address of user for SMTP Server.
+		'SMTP_ENCRYPT'  => 0,  # true/false to use SSL.
+		'SMTP_USERNAME' => '', # SMTP Username.
+		'SMTP_PASSWORD' => '', # SMTP Password.
+		'RETRIES'       => ''
+	};
 
-if( $options{'c'} ) {
-	if( lc( $options{'c'} ) eq 'true' ) {
-		$SMTP_ENCRYPT = 1;
-	} else {
-		$SMTP_ENCRYPT = 0;
+	$self->{'OPTIONS'} = {
+		'subject_'      => undef,
+		'subject'       => undef,
+		'from_'         => undef,
+		'from'          => undef,
+		'reply_'        => undef,
+		'reply'         => undef,
+		'bcc'           => undef,
+		'list_'         => undef,
+		'list'          => undef,
+		'template_'     => undef,
+		'template'      => undef,
+		'content-type'  => 'text/plain',
+		'viewtrack_url' => undef,
+		'cliktrack_url' => undef,
+		'mailshot_id'   => undef,
+		'attachments'   => []
+	};
+
+	GetOptions(
+
+		'logfile=s'     => \$self->{'LOGFILE'},
+
+		'mail-domain=s' => \$self->{'SMTP'}->{'MAIL_DOMAIN'},
+		'smtp-host=s'   => \$self->{'SMTP'}->{'SMTP_HOST'},
+		'smtp-port=i'   => \$self->{'SMTP'}->{'SMTP_PORT'},
+		'smtp-user=s'   => \$self->{'SMTP'}->{'SMTP_USER'},
+		'encrypt'       => \$self->{'SMTP'}->{'SMTP_ENCRYPT'},
+		'username:s'    => \$self->{'SMTP'}->{'SMTP_USERNAME'},
+		'password:s'    => \$self->{'SMTP'}->{'SMTP_PASSWORD'},
+		'retries:i'     => \$self->{'SMTP'}->{'RETRIES'},
+
+		'subject=s'     => \$self->{'OPTIONS'}->{'subject_'},
+		'from=s'        => \$self->{'OPTIONS'}->{'from_'},
+		'reply:s'       => \$self->{'OPTIONS'}->{'reply_'},
+		'bcc:s'         => \$self->{'OPTIONS'}->{'bcc'},
+		'list=s'        => \$self->{'OPTIONS'}->{'list_'},
+		'message=s'     => \$self->{'OPTIONS'}->{'template_'},
+		'view-track:s'  => \$self->{'OPTIONS'}->{'viewtrack_url'},
+		'click-track:s' => \$self->{'OPTIONS'}->{'cliktrack_url'},
+		'mailshot-id:s' => \$self->{'OPTIONS'}->{'mailshot_id'},
+		'attachment:s'  => $self->{'OPTIONS'}->{'attachments'}
+
+	);
+
+	$self->logger( qq(SUBJECT: "$self->{'OPTIONS'}->{'subject_'}") );
+
+	unless( $self->{'SMTP'}->{'MAIL_DOMAIN'} ) {
+		die( qq(ERROR: No Mail Domain Supplied!) );
 	}
-} else {
-	$SMTP_ENCRYPT = 0;
-}
 
-if( $options{'l'} ) {
-	$LOGFILE = $options{'l'};
-}
-
-if( $options{'h'} ) {
-	$SMTP_HOST = $options{'h'};
-} else {
-	logger( qq(ERROR: No SMTP Hostname Supplied!) );
-	exit(-1);
-}
-
-if( $options{'p'} ) {
-	$SMTP_PORT = $options{'p'};
-} else {
-	logger( qq(ERROR: No SMTP Port Supplied!) );
-	exit(-1);
-}
-
-if( $options{'u'} ) {
-	$SMTP_USER = $options{'u'};
-} else {
-	logger( qq(ERROR: No SMTP User Email Address Supplied!) );
-	exit(-1);
-}
-
-if( $options{'n'} ) {
-	$SMTP_USERNAME = $options{'n'};
-} else {
-	if( $ENV{'MAILWRENCH_SMTP_USERNAME'} ) {
-		$SMTP_USERNAME = $ENV{'MAILWRENCH_SMTP_USERNAME'};
-	} else {
-		logger( qq(ERROR: No SMTP Username Supplied!) );
-		exit(-1);
+	unless( $self->{'SMTP'}->{'SMTP_HOST'} ) {
+		die( qq(ERROR: No SMTP Hostname Supplied!) );
 	}
-}
 
-if( $options{'w'} ) {
-	$SMTP_PASSWORD = $options{'w'};
-} else {
-	if( $ENV{'MAILWRENCH_SMTP_PASSWORD'} ) {
-		$SMTP_PASSWORD = $ENV{'MAILWRENCH_SMTP_PASSWORD'};
-	} else {
-		logger( qq(ERROR: No SMTP Password Supplied!) );
-		exit(-1);
+	unless( $self->{'SMTP'}->{'SMTP_PORT'} ) {
+		die( qq(ERROR: No SMTP Port Supplied!) );
 	}
-}
 
-if( $options{'b'} ) {
-	$BCC = $options{'b'};
-}
+	unless( $self->{'SMTP'}->{'SMTP_USER'} ) {
+		die( qq(ERROR: No SMTP User Supplied!) );
+	}
 
-if( $options{'q'} && ( int( $options{'q'} ) > 0 ) ) {
-$retries = int( $options{'q'} );
+	if( $self->{'SMTP'}->{'SMTP_ENCRYPT'} ) {
+		unless( $self->{'SMTP'}->{'SMTP_USERNAME'} ) {
+			die( qq(ERROR: No SMTP Encryption Username Supplied!) );
+		}
+		unless( $self->{'SMTP'}->{'SMTP_PASSWORD'} ) {
+			die( qq(ERROR: No SMTP Encryption Password Supplied!) );
+		}
+	}
+
+	{	# Prepare Subject Header
+		$self->logger( "Preparing Subject Line..." );
+		my $subject = $self->load_file( $self->{'OPTIONS'}->{'subject_'} );
+		chomp( $subject );
+		$self->{'OPTIONS'}->{'subject'} = $self->encode_field( $subject );
+	}
+
+	{	# Prepare FROM/REPLY Headers
+		$self->logger( "Preparing FROM Header..." );
+		{
+			my $from_                      = $self->load_file( $self->{'OPTIONS'}->{'from_'} );
+			my ( $from_name, $from_email ) = ( $from_ =~ m/^(.+)\s+(<[^<>]+>)/ );
+			$from_name                     = $self->encode_field( $from_name );
+			$self->{'OPTIONS'}->{'from'}   = join( ' ', $from_name, $from_email );
+		}
+		$self->logger( "Preparing REPLY Header..." );
+		{
+			my $reply_                       = $self->load_file( $self->{'OPTIONS'}->{'reply_'} );
+			my ( $reply_name, $reply_email ) = ( $reply_=~ m/^(.+)\s+(<[^<>]+>)/ );
+			$reply_name                      = $self->encode_field( $reply_name );
+			$self->{'OPTIONS'}->{'reply'}    = join( ' ', $reply_name, $reply_email );
+		}
+	}
+
+	{	# Prepare Content-Type Header
+		$self->logger( "Setting Content-Type Header..." );
+		SWITCH: for( lc( $self->{'OPTIONS'}->{'template_'} ) ) {
+			m/\.txt$/ && do {
+				$self->{'OPTIONS'}->{'content-type'} = 'text/plain; charset=iso-2022-jp';
+				last SWITCH;
+			};
+			m/\.html$/ && do {
+				$self->{'OPTIONS'}->{'content-type'} = 'text/html; charset=iso-2022-jp';
+				last SWITCH;
+			};
+			die( "ERROR: Message Content-Type could not be determined!" );
+		}
+	}
+
+	{	# Loading Message Template into RAM
+		$self->logger( "Loading Message Template into RAM..." );
+		$self->{'OPTIONS'}->{'template'} = $self->load_file( $self->{'OPTIONS'}->{'template_'} );
+	}
+
+	{	# Loading List into RAM
+		$self->logger( "Loading Mailing List into RAM..." );
+		$self->{'OPTIONS'}->{'list'} = $self->load_file( $self->{'OPTIONS'}->{'list_'} );
+	}
+
+	return( $self );
 }
 
 ##########################################################################################
 
-logger( "Starting..." );
+sub run {
+	my $self = shift;
+	$self->logger( "Starting..." );
 
-logger( "Preparing Subject Line..." );
+	$self->logger( qq(      SMTP_HOST: "$self->{'SMTP'}->{'SMTP_HOST'}") );
+	$self->logger( qq(      SMTP_PORT: "$self->{'SMTP'}->{'SMTP_PORT'}") );
+	$self->logger( qq(      SMTP_USER: "$self->{'SMTP'}->{'SMTP_USER'}") );
+	$self->logger( qq(  SMTP_USERNAME: "$self->{'SMTP'}->{'SMTP_USERNAME'}") );
+	$self->logger( qq(  SMTP_PASSWORD: "********") );
+	$self->logger( qq(           FROM: "$self->{'OPTIONS'}->{'from'}") );
+	$self->logger( qq(       REPLY-TO: "$self->{'OPTIONS'}->{'reply'}") );
+	$self->logger( qq(            BCC: "$self->{'OPTIONS'}->{'bcc'}") );
+	$self->logger( qq(        SUBJECT: "$self->{'OPTIONS'}->{'subject_'}") );
+	$self->logger( qq(   CONTENT-TYPE: "$self->{'OPTIONS'}->{'content-type'}") );
+	$self->logger( qq(   MESSAGE PATH: "$self->{'OPTIONS'}->{'template_'}") );
+	$self->logger( qq(       LISTPATH: "$self->{'OPTIONS'}->{'list_'}") );
 
-chomp( $subject );
-
-my $subject_enc = encode_field( $subject );
-
-{
-	my ( $from_name, $from_email ) = ( $from =~ m/^(.+)\s+(<[^<>]+>)/ );
-	$from_name                     = encode_field( $from_name );
-	$from                          = join( ' ', $from_name, $from_email );
-}
-
-{
-	my ( $reply_name, $reply_email ) = ( $reply =~ m/^(.+)\s+(<[^<>]+>)/ );
-	$reply_name                      = encode_field( $reply_name );
-	$reply                           = join( ' ', $reply_name, $reply_email );
-}
-
-logger( "Setting Content-Type..." );
-
-SWITCH: for( $options{'m'} ) {
-	m/\.txt$/ && do {
-		$contenttype = 'text/plain; charset=iso-2022-jp';
-		last SWITCH;
-	};
-	m/\.html$/ && do {
-		$contenttype = 'text/html; charset=iso-2022-jp';
-		last SWITCH;
-	};
-	die( "oops" );
-}
-
-logger( qq(      SMTP_HOST: "$SMTP_HOST") );
-logger( qq(      SMTP_PORT: "$SMTP_PORT") );
-logger( qq(      SMTP_USER: "$SMTP_USER") );
-logger( qq(  SMTP_USERNAME: "$SMTP_USERNAME") );
-logger( qq(  SMTP_PASSWORD: "********") );
-logger( qq(            BCC: "$BCC") );
-logger( qq(       LISTPATH: "$options{'a'}") );
-logger( qq(       PATHNAME: "$options{'m'}") );
-logger( qq(           FROM: "$from") );
-logger( qq(       REPLY-TO: "$reply") );
-logger( qq(        SUBJECT: "$subject_enc") );
-logger( qq(     ATTACHPATH: "$options{'f'}") );
-logger( qq(    CONTENTTYPE: "$contenttype") );
-
-PROCESS: foreach my $line ( split( m/\n/s, $list ) ) {
-
-  chomp( $line );
-
-	if( $line =~ m/^#/ ) {
-		next PROCESS;
+	foreach my $attached ( @{$self->{'OPTIONS'}->{'attachments'}} ) {
+		$self->logger( qq(     ATTACHMENT: "$attached") );
 	}
 
-	my (
-		$email,
-		$name,
-		@fields
-	) = split( m/\t/, $line );
+	eval {
+		$self->process_list();
+	};
+	if( $@ ) {
+		$self->logger( $@, 1 );
+	}
 
-  if( $email =~ m/^[^\@]+\@[^\@]+\.[^\@]+$/i ) {
+	$self->logger( "Done." );
+	
+	return(1);
+}
 
-		$email = lc( $email );
+##########################################################################################
+
+sub process_list {
+	my $self = shift;
+	my $list = $self->{'OPTIONS'}->{'list'};
+
+	$self->logger( "Processing List...", 1 );
+
+	PROCESS: foreach my $line ( split( m/\n/s, $list ) ) {
+
+		chomp( $line );
+
+		if( $line =~ m/^#/ ) {
+			next PROCESS;
+		}
+
+		my (
+			$email,
+			$name,
+			@fields
+		) = split( m/\t/, $line );
+
+		if( $email =~ m/^[^\@]+\@[^\@]+\.[^\@]+$/i ) {
+
+			$email = lc( $email );
 		
-		if( exists( $duplicates{$email} ) ) {
-    	logger( qq(Already Sent: "$email") );
-			next PROCESS;		
-		} else {
-			$duplicates{$email} = $email;
-		}
-
-    logger( $email, 1 );
-
-		my $message = $template;
-
-		if( $name ) {
-			$message =~ s/__NAME__/$name/gs;
-		}
-
-   	logger( qq(mailshot_id: "$mailshot_id"), 2 );
-
-		if( $mailshot_id ) {
-			if( $contenttype =~ m:^text/html: ) {
-				my $tracker_image = join(
-					'',
-					$viewtrack_url,
-					'?',
-					join(
-						'&amp;',
-						join( '=', 'i', MIME::Base64::encode_base64url( $mailshot_id ) ),
-						join( '=', 'u', MIME::Base64::encode_base64url( $email ) )
-					)
-				);
-				$message =~ s/__TRACKER__/$tracker_image/gs;
+			if( exists( $self->{'duplicates'}->{$email} ) ) {
+				$self->logger( qq(Already Sent: "$email"), 2 );
+				next PROCESS;		
+			} else {
+				$self->{'duplicates'}->{$email} = $email;
 			}
-			{
-				my $leadcode = MIME::Base64::encode_base64url( join( '::', $mailshot_id, $email ) );
-				$message =~ s/__LEADCODE__/$leadcode/gs;
-			}
-		}
 
-		if( @fields ) {
-			for( my $i = 0 ; $i < @fields ; $i++ ) {
-				my $search  = join( '', '__FIELD', $i, '__' );
-				my $replace = $fields[$i];
-				$message =~ s/$search/$replace/gs;
-			}
-		}
+			$self->logger( $email, 2 );
 
-		if( $contenttype =~ m:^text/html: ) {
-			my $doc = XML::LibXML->load_html( string => $message );
-			if( $doc ) {
-				my @nodelist = $doc->getElementsByTagName( 'a' );
-				NODES: foreach my $node ( @nodelist ) {
-					my $href = $node->getAttribute( 'href' );
-					logger( qq(Link: "$href"), 3 );
-					my $href_new = join(
+			my $message = $self->{'OPTIONS'}->{'template'};
+
+			if( $name ) {
+				$message =~ s/__NAME__/$name/gs;
+			}
+
+			$self->logger( qq(mailshot_id: "$self->{'OPTIONS'}->{'mailshot_id'}"), 3 );
+
+			if( $self->{'OPTIONS'}->{'mailshot_id'} ) {
+				if( $self->{'OPTIONS'}->{'content-type'} =~ m:^text/html: ) {
+					my $tracker_image = join(
 						'',
-						$cliktrack_url,
+						$self->{'OPTIONS'}->{'viewtrack_url'},
 						'?',
 						join(
-							'&',
-							join( '=', 'i', MIME::Base64::encode_base64url( $mailshot_id ) ),
-							join( '=', 'u', MIME::Base64::encode_base64url( $email ) ),
-							join( '=', 'l', MIME::Base64::encode_base64url( $href ) )
+							'&amp;',
+							join( '=', 'i', MIME::Base64::encode_base64url( $self->{'OPTIONS'}->{'mailshot_id'} ) ),
+							join( '=', 'u', MIME::Base64::encode_base64url( $email ) )
 						)
 					);
-					$node->setAttribute( 'href', $href_new );
+					$message =~ s/__TRACKER__/$tracker_image/gs;
+				}
+				{
+					my $leadcode = MIME::Base64::encode_base64url( join( '::', $self->{'OPTIONS'}->{'mailshot_id'}, $email ) );
+					$message =~ s/__LEADCODE__/$leadcode/gs;
 				}
 			}
-			my $html = $doc->toStringHTML();
-			if( $html ) {
-				Encode::_utf8_on( $html );
-				$message = $html;
+
+			if( @fields ) {
+				for( my $i = 0 ; $i < @fields ; $i++ ) {
+					my $search  = join( '', '__FIELD', $i, '__' );
+					my $replace = $fields[$i];
+					$message =~ s/$search/$replace/gs;
+				}
 			}
+
+			if( $self->{'OPTIONS'}->{'content-type'} =~ m:^text/html: ) {
+				my $doc = XML::LibXML->load_html( string => $message );
+				if( $doc ) {
+					my @nodelist = $doc->getElementsByTagName( 'a' );
+					NODES: foreach my $node ( @nodelist ) {
+						my $href = $node->getAttribute( 'href' );
+						$self->logger( qq(Link: "$href"), 4 );
+						my $href_new = join(
+							'',
+							$self->{'OPTIONS'}->{'cliktrack_url'},
+							'?',
+							join(
+								'&',
+								join( '=', 'i', MIME::Base64::encode_base64url( $self->{'OPTIONS'}->{'mailshot_id'} ) ),
+								join( '=', 'u', MIME::Base64::encode_base64url( $email ) ),
+								join( '=', 'l', MIME::Base64::encode_base64url( $href ) )
+							)
+						);
+						$node->setAttribute( 'href', $href_new );
+					}
+				}
+				my $html = $doc->toStringHTML();
+				if( $html ) {
+					Encode::_utf8_on( $html );
+					$message = $html;
+				}
+			}
+
+			eval {
+
+				my $attempt = $self->{'SMTP'}->{'RETRIES'};
+
+				do {
+					$self->logger( "Attempt: $attempt $email", 3 );
+					my $success = undef;
+					eval {
+						$success = $self->sendmail(
+							recipient => $email,
+							message   => Encode::encode( 'iso-2022-jp', $message )
+						);
+					};
+					if( $@ ) {
+						die( $@ );
+					}
+					if( $success ) {
+						$attempt = 0;
+					}
+					$attempt--;
+				} while( $attempt > 0 );
+
+			};
+			if( $@ ) {
+				die( $@ );
+			}
+
 		}
 
-		my @attachpath = split( m/,/, $options{'f'} );
+		$self->{'sleep_count'}++;
 
-		eval {
-
-			my $attempt = $retries;
-
-			do {
-				logger( "Attempt: $attempt $email", 2 );
-				my $success = sendmail(
-					smtp_host     => $SMTP_HOST,
-					smtp_port     => $SMTP_PORT,
-					smtp_user     => $SMTP_USER,
-					smtp_encrypt  => $SMTP_ENCRYPT,
-					smtp_username => $SMTP_USERNAME,
-					smtp_password => $SMTP_PASSWORD,
-					from          => $from,
-					reply         => $reply || $from,
-					recipient     => $email,
-					subject       => $subject_enc,
-					contenttype   => $contenttype,
-					message       => Encode::encode( 'iso-2022-jp', $message ),
-					attachments   => \@attachpath
-				);
-				if( $success ) {
-					$attempt = 0;
-				}
-				$attempt--;
-			} while( $attempt > 0 );
-
-		};
-		if( $@ ) {
-			logger( $@ );
+		if( $self->{'sleep_count'} >= 10 ) {
+			$self->{'sleep_count'} = 0;
+			sleep(1);
 		}
 
 	}
 
-	$sleep_count++;
-
-	if( $sleep_count >= 10 ) {
-		$sleep_count = 0;
-		sleep(1);
-	}
-
+	return(1);
 }
-
-logger( "Done." );
-
-exit(0);
 
 ##########################################################################################
 
 sub load_file {
+	my $self     = shift;
 	my $pathname = shift;
+
+	unless( $pathname ) {
+		cluck();
+	}
+
 	my $data     = '';
 	if( open( FILE, "<:encoding(utf-8)", $pathname ) ) {
 		while( my $line = <FILE> ) {
@@ -373,81 +400,72 @@ sub load_file {
 ##########################################################################################
 
 sub sendmail {
+	my $self          = shift;
 	my %args          = @_;
-	my $smtp_domain   = $args{'smtp_domain'};
-	my $smtp_host     = $args{'smtp_host'};
-	my $smtp_port     = $args{'smtp_port'};
-	my $smtp_user     = $args{'smtp_user'};
-
-	my $smtp_encrypt  = $args{'smtp_encrypt'} || 0;
-	my $smtp_username = $args{'smtp_username'} || undef;
-	my $smtp_password = $args{'smtp_password'} || undef;
-
-	my $from          = $args{'from'};
-	my $reply         = $args{'reply'} || $from;
 	my $recipient     = $args{'recipient'};
-	my $subject       = $args{'subject'};
-	my $contenttype   = $args{'contenttype'};
 	my $message       = $args{'message'};
-	my $attachments   = $args{'attachments'};
+	my $smtp_encrypt  = $self->{'SMTP'}->{'SMTP_ENCRYPT'} || 0;
+	my $smtp_username = $self->{'SMTP'}->{'SMTP_USERNAME'} || undef;
+	my $smtp_password = $self->{'SMTP'}->{'SMTP_PASSWORD'} || undef;
 	my $success       = undef;
-
 	my $smtp          = undef;
 
 	if( $smtp_encrypt ) {
 		$smtp = Net::SMTP::SSL->new(
-			$smtp_host,
-			Port  => $smtp_port,
-			Hello => $smtp_domain,
+			$self->{'SMTP'}->{'SMTP_HOST'},
+			Port  => $self->{'SMTP'}->{'SMTP_PORT'},
+			Hello => $self->{'SMTP'}->{'MAIL_DOMAIN'},
 			Debug => 0
 		);
 		if( defined( $smtp ) ) {
 			if( $smtp_username && $smtp_password ) {
-				logger( qq(Authenticating), 3 );
+				$self->logger( qq(Authenticating...), 3 );
 				$smtp->auth( $smtp_username, $smtp_password );
 			} else {
-				logger( qq(Skipping Authentication), 3 );
+				$self->logger( qq(Skipping Authentication), 3 );
 			}
 		}
 	} else {
 		$smtp = Net::SMTP->new(
-			$smtp_host,
-			Hello => $smtp_domain,
+			$self->{'SMTP'}->{'SMTP_HOST'},
+			Hello => $self->{'SMTP'}->{'MAIL_DOMAIN'},
 			Debug => 0
 		);
 	}
 
 	if( defined( $smtp ) ) {
 
-		if( $smtp->mail( $from ) ) {
+		if( $smtp->mail( $self->{'OPTIONS'}->{'from'} ) ) {
 
 			if( $smtp->to( $recipient ) ) {
-				if( $BCC ) {
-					$smtp->bcc( $BCC );
+				if( $self->{'OPTIONS'}->{'bcc'} ) {
+					$smtp->bcc( $self->{'OPTIONS'}->{'bcc'} );
 				}
 				$smtp->data();
-				my $data = build_multipart(
-					from        => $from,
-					reply       => $reply,
-					to          => $recipient,
-					subject     => $subject,
-					contenttype => $contenttype,
-					message     => $message,
-					attachments => $attachments
-				);
+				my $data = undef;
+				eval {
+					$data = $self->build_multipart(
+						to      => $recipient,
+						message => $message
+					);
+				};
+				if( $@ ) {
+					$smtp->quit();
+					die( $@ );
+				}
 				$smtp->datasend( $data );
 				$smtp->dataend();
 				$success = 1;
-				logger( qq(SENT MAIL: "$recipient"), 2 );
+				$self->logger( qq(SENT MAIL: "$recipient"), 2 );
 			} else {
-				logger( qq(ERROR: sendmail 1: "$recipient"), 2 );
+				$self->logger( qq(ERROR: sendmail 1: "$recipient"), 2 );
 			}
 		} else {
-			logger( qq(ERROR: sendmail 2: "$recipient"), 2 );
+			$self->logger( qq(ERROR: sendmail 2: "$recipient"), 2 );
 		}
 		$smtp->quit();
 	} else {
-		logger( qq(ERROR: Failed to connect to SMTP Server: "$smtp_host" "$recipient"), 2 );
+		$self->logger( qq(ERROR: Failed to connect to SMTP Server: "$self->{'SMTP'}->{'SMTP_HOST'}" "$recipient"), 2 );
 	}
 	return( $success );
 }
@@ -455,47 +473,70 @@ sub sendmail {
 ##########################################################################################
 
 sub build_multipart {
-	my %args        = @_;
-	my $from        = $args{'from'};
-	my $reply       = $args{'reply'} || $from;
-	my $to          = $args{'to'};
-	my $subject     = $args{'subject'};
-	my $contenttype = $args{'contenttype'};
-	my $message     = $args{'message'};
-	my $attachments = $args{'attachments'};
-	my $date        = HTTP::Date::time2str( time() );
-	$date           =~ s/GMT/+0000/;
-	my $mime        = MIME::Entity->build(
+	my $self    = shift;
+	my %args    = @_;
+	my $to      = $args{'to'};
+	my $message = $args{'message'};
+	my $date    = HTTP::Date::time2str( time() );
+	$date       =~ s/GMT/+0000/;
+	my $mime    = MIME::Entity->build(
 		'Type'     => "multipart/mixed",
-		'From'     => $from,
-		'Reply-To' => $reply,
+		'From'     => $self->{'OPTIONS'}->{'from'},
 		'To'       => $to,
-		'Subject'  => $subject,
+		'Reply-To' => $self->{'OPTIONS'}->{'reply'} || $self->{'OPTIONS'}->{'from'},
+		'Subject'  => $self->{'OPTIONS'}->{'subject'},
 		'Date'     => $date,
 		'Data'     => [ $message ]
 	);
-	foreach my $filename ( @{$attachments} ) {
+	foreach my $filename ( @{$self->{'OPTIONS'}->{'attachments'}} ) {
 		if( -e $filename ) {
-			my $ct = 'text/plain';
-			if( $filename =~ m/\.vcs$/i ) {
-				$ct = 'text/x-vCalendar; charset=us-ascii';
-			} elsif( $filename =~ m/\.pdf$/i ) {
-				$ct = 'application/pdf';
-			} elsif( $filename =~ m/\.txt$/i ) {
-				$ct = 'text/plain; charset=iso-2022-jp';
-			} elsif( $filename =~ m/\.html$/i ) {
-				$ct = 'text/html; charset=iso-2022-jp';
+			my $ct = 'binary/octet-stream';
+
+			SWITCH: for( $filename ) {
+				m/\.vcs$/i && do {
+					$ct = 'text/x-vCalendar; charset=us-ascii';
+					last SWITCH;
+				};
+				m/\.gif$/i && do {
+					$ct = 'image/gif';
+					last SWITCH;
+				};
+				m/\.jpg$/i && do {
+					$ct = 'image/jpeg';
+					last SWITCH;
+				};
+				m/\.png$/i && do {
+					$ct = 'image/png';
+					last SWITCH;
+				};
+				m/\.pdf$/i && do {
+					$ct = 'application/pdf';
+					last SWITCH;
+				};
+				m/\.txt$/i && do {
+					$ct = 'text/plain; charset=iso-2022-jp';
+					last SWITCH;
+				};
+				m/\.html$/i && do {
+					$ct = 'text/html; charset=iso-2022-jp';
+					last SWITCH;
+				};
+				m// && do {
+					last SWITCH;
+				};
 			}
 			$mime->attach(
 				Path     => $filename,
 				Type     => $ct,
 				Encoding => 'base64'
 			);
+		} else {
+			die( qq(ERROR: Attachment file not found: "$filename") );
 		}
 	}
 	$mime->attach(
 		Data     => $message,
-		Type     => $contenttype,
+		Type     => $self->{'OPTIONS'}->{'content-type'},
 		Encoding => '7bit'
 	);
 	return( $mime->stringify() );
@@ -504,13 +545,14 @@ sub build_multipart {
 ##########################################################################################
 
 sub encode_field {
+	my $self    = shift;
 	my $string  = shift;
 	my $encoded = join(
 		'?',
 		'=',
 		'iso-2022-jp',
 		'B',
-		encode_base64( encode( 'iso-2022-jp', $string ), '' ),
+		MIME::Base64::encode_base64( encode( 'iso-2022-jp', $string ), '' ),
 		'='
 	);
 	return( $encoded );
@@ -519,9 +561,10 @@ sub encode_field {
 ##########################################################################################
 
 sub logger {
+	my $self    = shift;
 	my $message = shift;
 	my $depth   = shift || 0;
-	open( LOGFILE, ">>" . $LOGFILE );
+	open( LOGFILE, ">>" . $self->{'LOGFILE'} );
 	print( "  " x $depth . $message . "\n" );
 	print( LOGFILE "  " x $depth . $message . "\n" );
 	close( LOGFILE );

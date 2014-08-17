@@ -1,19 +1,22 @@
 perl MailWrench-Japanese.pl ^
--a "batch/test-addresses.ja.txt" ^
--b "some-other-email-address@domain.com" ^
--c true ^
--d "mail.domain.com" ^
--e "batch/from.ja.txt" ^
--h "smtp.domain.com" ^
--i "https://your-domain.com/path/to/view/track/service" ^
--k "https://your-domain.com/path/to/click/track/service" ^
--l "batch/log.txt" ^
--m "batch/message.ja.txt" ^
--n "smtp-username" ^
--p 465 ^
--q 10 ^
--r "batch/from.ja.txt" ^
--s "batch/subject.ja.txt" ^
--t "development-mode" ^
--u "your-email-address@domain.com" ^
--w "smtp-password"
+^
+--logfile "batch/log.txt" ^
+^
+--mail-domain "mail.domain.com" ^
+--smtp-host "smtp.domain.com" ^
+--smtp-port 465 ^
+--smtp-user "your-email-address@domain.com" ^
+--username "smtp-username" ^
+--password "smtp-password"
+--retries 10 ^
+--encrypt ^
+^
+--subject "batch/subject.ja.txt" ^
+--from "batch/from.ja.txt" ^
+--reply "batch/from.ja.txt" ^
+--bcc "some-other-email-address@domain.com" ^
+--list "batch/test-addresses.ja.txt" ^
+--message "batch/message.ja.txt" ^
+--view-track "https://your-domain.com/path/to/view/track/service" ^
+--click-track "https://your-domain.com/path/to/click/track/service" ^
+--mailshot_id "development-mode" ^
