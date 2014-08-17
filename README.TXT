@@ -1,10 +1,8 @@
-!!WARNING!! THIS IS STILL IN ALPHA AS OF 2014/07/23
-
 -----------------------------------------------------------------------------
 
 This is the README for MailWrench-Japanese.
 
-Last Modified: 2014-07-23
+Last Modified: 2014-08-17
 
 See http://japanese-mailshots.blogspot.jp/ for more info.
 
