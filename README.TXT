@@ -2,9 +2,9 @@
 
 This is the README for MailWrench-Japanese.
 
-Last Modified: 2014-08-17
+Last Modified: 2014-08-20
 
-See http://japanese-mailshots.blogspot.jp/ for more info.
+See http://japanese-mailshots.blogspot.com/ for more info.
 
 -----------------------------------------------------------------------------
 
@@ -53,23 +53,23 @@ The script may be used as-is, or it may be called from some other process.
 The currently supported options are:
 
 	--from
-	
+
 		Path to text file containing email address of sender.
 
 	--reply
-	
+
 		Path to text file containing email address for reply-to.
 
 	--list
-	
-		Path to text file containing email addresses.
+
+		Path to text file containing email addresses. See below for more information on the format of this file.
 
 	--message
-	
+
 		Path to file containing message body, in plain text or HTML format.
 
 	--subject
-	
+
 		Path to text file containing subject line.
 
 	--attachment [may be repeated]
@@ -77,19 +77,19 @@ The currently supported options are:
 		Path to file to attach; accepts PDF, VCS, HTML, TXT, JPG, GIF and PNG.
 
 	--logfile
-	
+
 		Path to log file.
 
 	--mail-domain [optional]
-	
+
 		Some SMTP servers require your domain to be passed, consult your system administrator if this is required. This is often simply the domain part of your email address.
 
 	--smtp-host
-	
+
 		SMTP server hostname or IP address.
 
 	--smtp-port [optional]
-	
+
 		SMTP server port number, consult your system administrator for this.
 
 	--encrypt [optional]
@@ -105,25 +105,25 @@ The currently supported options are:
 		SMTP server password, if encryption is enabled.
 
 	--bcc [optional]
-	
+
 		Email address to BCC a copy of each email sent to.
 
 	--retries
-	
+
 		Requires an integer. Number of transmission tries before giving up.
 
 	--view-track
-	
+
 		URL of view tracking service, see below for more information.
 
 	--click-track
-	
+
 		URL of click tracking service, see below for more information.
 
 	--mailshot-id
-	
+
 		A meaningful string value that will be incorporated into links in the HTML format version of the message body.
-	
+
 -----------------------------------------------------------------------------
 
 WINDOWS USAGE
@@ -146,11 +146,27 @@ Linux, UNIX and Mac OS X USAGE:
 
 -----------------------------------------------------------------------------
 
+RECIPIENT LIST FILE FORMAT
+
+At it's simplest, the recipient list specified with the --list command line option can be a list of simple email addresses.
+
+For more advanced uses, the recipient list is treated as a tab-separated file:
+
+	Column 0: Contains the recipient's email address
+
+	Column 1: Contains a "Name" to be interpolated. In the message template, all occurrences of the placeholder __NAME__ will be replaced with the contents of column 1.
+
+	Column 2 .. n: If necessary, it is also possible to have further information for each recipient interpolated into the message template. In this case, placeholders like __FIELD0__, __FIELD1__, ..., __FIELD10__ may be used. Column 2 will be mapped to Field 0, Column 3 will be mapped to Field 1, and so on.
+
+In all cases, it is critical to ensure that the information to be merged is complete, with no exceptions, to avoid the embarrassing situation of "Dear __NAME__" appearing in the sent email. If necessary, send two or more versions of the mailshot, one where you have the data available, and a more generic version without placeholders for those recipients with incomplete data.
+
+-----------------------------------------------------------------------------
+
 MAILSHOT-ID AND THE LEADCODE
 
 For marketing purposes, it is often useful to employ a lead code to match email reponses to a particular marketing campaign.
 
-Use the --mailshot-id parameter to do this. In the HTML format version of your message, you may then add the placeholder __LEADCODE__ to embedded URLs. The mailshot program will then concatenate and Base64-encode the mailshot-id, :: (two colons), and the recipient's email address. Your server software will be responsible for logging and decoding these values. 
+Use the --mailshot-id parameter to do this. In the HTML format version of your message, you may then add the placeholder __LEADCODE__ to embedded URLs. The mailshot program will then concatenate and Base64-encode the mailshot-id, :: (two colons), and the recipient's email address. Your server software will be responsible for logging and decoding these values.
 
 -----------------------------------------------------------------------------
 

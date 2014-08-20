@@ -1,5 +1,5 @@
 # This file must be encoded as UTF-8 text
 # Comment lines begin with a # character
-your-email-address@your-domain.com	お名前
-your-email-address@your-domain.com	お名前
-your-email-address@your-domain.com	お名前
+your-email-address@your-domain.com	お名前	Placeholder 0 example text	Placeholder 1 example text	Placeholder 2 example text
+your-email-address@your-domain.com	お名前	Placeholder 0 example text	Placeholder 1 example text	Placeholder 2 example text
+your-email-address@your-domain.com	お名前	Placeholder 0 example text	Placeholder 1 example text	Placeholder 2 example text

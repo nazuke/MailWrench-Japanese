@@ -2,3 +2,13 @@ This is some Japanese text encoded in UTF-8:
 日本語
 いち、に、さん、休み
 1234567890
+
+Field Interpolation Examples
+
+Dear __NAME__
+
+This is is where Field0: __FIELD0__ will appear in our test.
+
+And this is Field1: __FIELD1__.
+
+Finally, this __FIELD2__ is Field2.
