@@ -3,7 +3,7 @@
 =pod
 
 	AUTHOR: nazuke.hondou@googlemail.com
-	UPDATED: 20140820
+	UPDATED: 20140827
 
 	ABOUT:
 
@@ -187,27 +187,33 @@ sub run {
 	my $self = shift;
 	$self->logger( "Starting..." );
 
-	$self->logger( qq(      SMTP_HOST: "$self->{'SMTP'}->{'SMTP_HOST'}") );
-	$self->logger( qq(      SMTP_PORT: "$self->{'SMTP'}->{'SMTP_PORT'}") );
-	$self->logger( qq(  SMTP_USERNAME: "$self->{'SMTP'}->{'SMTP_USERNAME'}") );
-	$self->logger( qq(  SMTP_PASSWORD: "********") );
-	$self->logger( qq(           FROM: "$self->{'OPTIONS'}->{'from'}") );
-	$self->logger( qq(       REPLY-TO: "$self->{'OPTIONS'}->{'reply'}") );
-	$self->logger( qq(            BCC: "$self->{'OPTIONS'}->{'bcc'}") );
-	$self->logger( qq(        SUBJECT: "$self->{'OPTIONS'}->{'subject_'}") );
-	$self->logger( qq(   CONTENT-TYPE: "$self->{'OPTIONS'}->{'content-type'}") );
-	$self->logger( qq(   MESSAGE PATH: "$self->{'OPTIONS'}->{'template_'}") );
-	$self->logger( qq(       LISTPATH: "$self->{'OPTIONS'}->{'list_'}") );
+	$scan->log_depth(1);
+	
+	$self->logger( qq(    SMTP_HOST: "$self->{'SMTP'}->{'SMTP_HOST'}") );
+	$self->logger( qq(    SMTP_PORT: "$self->{'SMTP'}->{'SMTP_PORT'}") );
+	$self->logger( qq(SMTP_USERNAME: "$self->{'SMTP'}->{'SMTP_USERNAME'}") );
+	$self->logger( qq(SMTP_PASSWORD: "********") );
+	$self->logger( qq(         FROM: "$self->{'OPTIONS'}->{'from'}") );
+	$self->logger( qq(     REPLY-TO: "$self->{'OPTIONS'}->{'reply'}") );
+	$self->logger( qq(          BCC: "$self->{'OPTIONS'}->{'bcc'}") );
+	$self->logger( qq(      SUBJECT: "$self->{'OPTIONS'}->{'subject_'}") );
+	$self->logger( qq( CONTENT-TYPE: "$self->{'OPTIONS'}->{'content-type'}") );
+	$self->logger( qq( MESSAGE PATH: "$self->{'OPTIONS'}->{'template_'}") );
+	$self->logger( qq(     LISTPATH: "$self->{'OPTIONS'}->{'list_'}") );
 
 	foreach my $attached ( @{$self->{'OPTIONS'}->{'attachments'}} ) {
-		$self->logger( qq(     ATTACHMENT: "$attached") );
+		$self->logger( qq(   ATTACHMENT: "$attached") );
 	}
+
+	$scan->log_depth(-1);
 
 	eval {
 		$self->process_list();
 	};
 	if( $@ ) {
-		$self->logger( $@, 1 );
+		$scan->log_depth(1);
+		$self->logger( $@ );
+		$scan->log_depth(-1);
 	}
 
 	$self->logger( "Done." );
@@ -221,7 +227,11 @@ sub process_list {
 	my $self = shift;
 	my $list = $self->{'OPTIONS'}->{'list'};
 
-	$self->logger( "Processing List...", 1 );
+	$scan->log_depth(1);
+
+	$self->logger( "Processing List..." );
+
+	$scan->log_depth(1);
 
 	PROCESS: foreach my $line ( split( m/\n/s, $list ) ) {
 
@@ -237,24 +247,28 @@ sub process_list {
 			@fields
 		) = split( m/\t/, $line );
 
+		$scan->log_depth(1);
+
 		if( $email =~ m/^[^\@]+\@[^\@]+\.[^\@]+$/i ) {
 
 			$email = lc( $email );
 		
 			if( exists( $self->{'duplicates'}->{$email} ) ) {
-				$self->logger( qq(Already Sent: "$email"), 2 );
+				$self->logger( qq(Already Sent: "$email") );
 				next PROCESS;		
 			} else {
 				$self->{'duplicates'}->{$email} = $email;
 			}
 
-			$self->logger( $email, 2 );
+			$self->logger( $email );
 
 			my $message = $self->{'OPTIONS'}->{'template'};
 
 			if( $name ) {
 				$message =~ s/__NAME__/$name/gs;
 			}
+
+			$scan->log_depth(1);
 
 			$self->logger( qq(mailshot_id: "$self->{'OPTIONS'}->{'mailshot_id'}"), 3 );
 
@@ -286,13 +300,15 @@ sub process_list {
 				}
 			}
 
+			$scan->log_depth(1);
+
 			if( $self->{'OPTIONS'}->{'content-type'} =~ m:^text/html: ) {
 				my $doc = XML::LibXML->load_html( string => $message );
 				if( $doc ) {
 					my @nodelist = $doc->getElementsByTagName( 'a' );
 					NODES: foreach my $node ( @nodelist ) {
 						my $href = $node->getAttribute( 'href' );
-						$self->logger( qq(Link: "$href"), 4 );
+						$self->logger( qq(Link: "$href") );
 						my $href_new = join(
 							'',
 							$self->{'OPTIONS'}->{'cliktrack_url'},
@@ -314,12 +330,14 @@ sub process_list {
 				}
 			}
 
+			$scan->log_depth(-1);
+
 			eval {
 
 				my $attempt = $self->{'SMTP'}->{'RETRIES'};
 
 				do {
-					$self->logger( "Attempt: $attempt $email", 3 );
+					$self->logger( "Attempt: $attempt $email" );
 					my $success = undef;
 					eval {
 						$success = $self->sendmail(
@@ -341,7 +359,11 @@ sub process_list {
 				die( $@ );
 			}
 
+			$scan->log_depth(-1);
+
 		}
+
+		$scan->log_depth(-1);
 
 		$self->{'sleep_count'}++;
 
@@ -351,6 +373,8 @@ sub process_list {
 		}
 
 	}
+
+	$scan->log_depth(-1);
 
 	return(1);
 }
@@ -537,13 +561,24 @@ sub load_file {
 
 ##########################################################################################
 
+sub log_depth {
+	my $self  = shift;
+	my $value = shift || 0;
+	if( $value != 0 ) {
+		$self->{'log_depth'} = $self->{'log_depth'} + $value;
+	}
+	return( $self->{'log_depth'} );
+}
+
+##########################################################################################
+
 sub logger {
 	my $self    = shift;
 	my $message = shift;
-	my $depth   = shift || 0;
+	my $logline = gmtime() .  ( '  ' x $self->log_depth() ) . ' ' .  $message . "\n";
 	open( LOGFILE, ">>" . $self->{'logfile'} );
-	print( "  " x $depth . $message . "\n" );
-	print( LOGFILE "  " x $depth . $message . "\n" );
+	print( $logline );
+	print( LOGFILE $logline );
 	close( LOGFILE );
 	return(1);
 }
