@@ -4,8 +4,6 @@ This is the README for MailWrench-Japanese.
 
 Last Modified: 2014-08-20
 
-See http://japanese-mailshots.blogspot.com/ for more info.
-
 -----------------------------------------------------------------------------
 
 ABOUT MAILWRENCH-JAPANESE
