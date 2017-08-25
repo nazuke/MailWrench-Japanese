@@ -526,6 +526,8 @@ sub build_multipart {
 
 ##########################################################################################
 
+# https://tools.ietf.org/html/rfc1468
+
 sub encode_field {
 	my $self    = shift;
 	my $string  = shift;
